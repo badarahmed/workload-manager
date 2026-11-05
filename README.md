@@ -86,6 +86,16 @@ flowchart TD
 | Plans and state stay deterministic and reviewable | Only apply is agentic; continuous self-healing is out of scope. |
 | Durable journals aid recovery after interruption | A journal cannot prove an SSH operation completed; ambiguous outcomes may still need operator inspection. |
 
+### Options considered
+
+| Option | Why not |
+|---|---|
+| Fully deterministic, with an LLM used at build time to write the configuration rather than at runtime | Verbose: lots of Terraform code, and every recovery edge case must be anticipated and encoded. |
+| Fully agentic loop | Too unreliable without extensive prompt tuning and evals. |
+| Kubernetes | Too heavy for a handful of hosts and existing containers. |
+| A purpose-built subset of Kubernetes | Considered, but too much work to build and maintain. |
+| A custom declarative control plane with an agentic data plane | Brainstorming this design led to the current approach. Reusing OpenTofu as the control plane gives the best balance of capability against complexity, build effort and maintenance. |
+
 See [implementation boundaries](docs/development.md) and the
 [agent design](docs/workload-manager-pi-codemode-design.md) for details.
 
