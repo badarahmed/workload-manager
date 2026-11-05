@@ -3,92 +3,97 @@
 Version **0.1.0** (unreleased prototype). See [versioning](docs/versioning.md) and
 the [changelog](CHANGELOG.md).
 
-wm uses OpenTofu to declare desired workload state and a Pi Durable/codemode agent
-to reconcile it through scoped tools. It manages existing Docker containers and
-checks functional readiness, with configurable cloud or OpenAI-compatible models.
+wm manages Docker workloads across hosts from one declarative configuration. You
+state what each workload should be: running or stopped, which image or model it
+serves, what "ready" means and how much recovery is allowed. wm checks the real
+state, plans the difference, brings the workload there and confirms it works
+before reporting success. An operator CLI shows status across all workloads and
+runs plan, apply, start, stop and restart for each one.
 
-This is an early prototype. It currently adopts exact existing containers rather
-than provisioning a complete deployment. Docker applications run on the controller's
-explicitly pinned daemon; the implemented model adapter uses SSH and vLLM-SR Engine
-mode. Other drivers, engine profiles and multi-host orchestration are design work.
+This is an early prototype. It adopts existing containers rather than creating
+new ones, and supports start, stop and bounded recovery. Provisioning, image or
+model replacement and multi-host orchestration are design goals.
+
+## Why
+
+Containers sprawl. Mine run across Mac and Linux machines: local apps on one
+host, model servers on GPU hosts reached over SSH. Each was started by hand or by a
+one-off Compose file, and knowing what should be running, what is actually
+running and whether it works meant logging into each host. Restarting a model
+server that failed to load took several manual checks.
+
+wm gives each workload one declared intent, one place to see its status and one
+reviewed path for changing it, without replacing the Docker setups that already
+work.
 
 ## Declarative intent, agentic reconciliation
 
-wm combines OpenTofu's deterministic refresh/plan/apply cycle with a bounded
-Pi Durable agent loop inside the provider. OpenTofu owns the resource graph,
-planned values and state. During apply, the agent chooses how to reach the approved
-outcome using codemode to compose calls to scoped workload tools.
+Infrastructure-as-code tools are good at declaring *what* you want and showing a
+reviewable plan. They are poor at the procedural part of making a workload
+healthy: a model takes minutes to load, a start fails and the logs explain why, a
+restart might help or might not. Encoding that judgement in HCL or provisioner
+scripts is brittle.
+
+wm splits the problem. OpenTofu owns the declaration, plan and state. During
+apply, the wm provider hands the approved intent to a bounded agent
+([Pi Durable](docs/workload-manager-pi-codemode-design.md) with codemode) that
+decides how to get there using a small set of scoped tools: observe, start, stop,
+wait, read logs, check metrics, probe readiness and restart.
 
 ```mermaid
 flowchart LR
-  H["HCL workload intent"] --> T["OpenTofu<br/>Refresh, plan, apply"]
-  S["OpenTofu state"] --> T
-  T --> P["wm provider<br/>Validate planned intent and runtime identity"]
-  P -->|Apply needs reconciliation| A["Pi Durable + codemode<br/>Reconcile within the approved scope"]
-  A --> E["Observations and execution results"]
-  E --> P
-  P -->|Record verified outcome or incomplete status| S
+  H["HCL intent"] --> T["OpenTofu<br/>plan / apply"]
+  S["State"] --> T
+  T --> P["wm provider<br/>validate intent and identity"]
+  P -->|needs reconciliation| A["Agent loop<br/>scoped tools only"]
+  A -->|observations, results| P
+  P -->|verified outcome or incomplete| S
 ```
 
-This keeps HCL focused on what the operator wants: running or stopped, the pinned
-image/model, readiness requirements and recovery policy. Procedural details such
-as inspecting a failed start, waiting for a model to load, checking logs (when
-policy allows) and deciding whether an authorized restart could help live inside
-reconciliation.
-A single workload resource carries that intent; the provider owns the recovery
-workflow instead of asking operators to encode each step in HCL or provisioner
-scripts. Exact runtime identity and transport still belong in companion bindings.
+The agent chooses steps; deterministic code decides what is allowed and what
+counts as done:
 
-The inner loop uses fresh observations and tool errors to choose its next step.
-Codemode lets the model express that orchestration in JavaScript, while the
-deterministic broker checks tool arguments, ownership, policy and budgets before
-performing operations. Functional probes establish readiness. The agent's claim
-of success alone cannot complete an apply.
+- Every tool call passes through a broker that checks container identity,
+  ownership, policy and budgets. The agent cannot change the requested image or
+  model, weaken readiness checks or touch other containers.
+- Success requires an independent readiness probe after the agent finishes. The
+  agent saying it succeeded is never enough.
+- Refresh and plan never call the model, and an apply that finds the workload
+  already converged skips the agent.
+- Attempts, commands, model calls and time are capped. Tool results and errors
+  are journaled so interrupted work can be inspected and resumed.
+- Reconciliation runs only during apply. wm is not a background daemon.
 
 ```mermaid
 flowchart TD
-  O["Observe runtime identity and readiness"] --> C{"Desired state reached?"}
-  C -->|Yes| V["Independent final verification"]
-  V -->|Pass| D["Return verified result"]
+  O["Observe"] --> C{"Desired state reached?"}
+  C -->|Yes| V["Independent verification"]
+  V -->|Pass| D["Verified result"]
   V -->|Fail| B
-  C -->|No| B{"Attempts, budget and deadline remaining?"}
-  B -->|Yes| A["Agent chooses an authorized next step"]
-  A --> K["Codemode calls scoped tools<br/>Inspect, wait or act through wm_step"]
-  K --> J["Journal tool results, errors and receipts"]
+  C -->|No| B{"Attempts, budget, time left?"}
+  B -->|Yes| A["Agent calls scoped tools"]
+  A --> J["Journal results and receipts"]
   J --> O
-  B -->|No| F["Return failure and partial progress"]
+  B -->|No| F["Report failure and partial progress"]
 ```
-
-Pi Durable preserves execution history and supports resuming interrupted work.
-wm's own identity checks, mutation receipts and fresh observation handle ambiguous
-external outcomes; a durable journal alone cannot prove that an SSH operation
-completed or make an arbitrary external action safe to replay.
-
-Refresh and planning use deterministic observation without calling the LLM.
-An apply that finds the workload already converged also skips the agent. The loop
-runs during an operation; it does not continuously repair workloads after apply.
-The current tools manage captured containers and bounded recovery. Broader recipe
-generation, provisioning and runtime replacement remain design goals.
 
 ### Tradeoffs
 
-| Benefit | Tradeoff |
+| Benefit | Cost |
 |---|---|
-| Less HCL for procedural recovery | Complexity moves into the provider, tool contracts, probes and tests. |
-| Recovery adapts to observed failures | Agent actions can vary between runs and add model latency, cost and availability requirements. A plan fixes intent and scope rather than every future tool call. |
-| Durable execution history aids recovery | Journals, receipts and compatibility need maintenance; interrupted remote outcomes can still require operator inspection. |
+| HCL stays short: intent, not recovery procedures | Complexity moves into the provider, tool contracts, probes and tests. |
+| Recovery adapts to what actually went wrong | Runs can take different paths and need a model, adding latency, cost and an availability dependency. A plan fixes intent and scope, not every tool call. |
+| Plans and state stay deterministic and reviewable | Only apply is agentic; continuous self-healing is out of scope. |
+| Durable journals aid recovery after interruption | A journal cannot prove an SSH operation completed; ambiguous outcomes may still need operator inspection. |
 
-Keep intent, ownership and acceptance checks explicit. The agent can choose among
-supported actions, but cannot change the requested model, weaken readiness checks
-or expand its mutation scope. See [implementation boundaries](docs/development.md)
-and the [agent design](docs/workload-manager-pi-codemode-design.md) for details.
+See [implementation boundaries](docs/development.md) and the
+[agent design](docs/workload-manager-pi-codemode-design.md) for details.
 
 ## Build and verify
 
-Requires Go (see [go.mod](go.mod)), Node >=22.19, npm, Python 3, OpenTofu, and SSH.
-Docker CLI access is required on the controller for local applications and on the
-remote host for model workloads. Install dependencies and validate both Go binaries
-in a separate output directory:
+Requires Go (see [go.mod](go.mod)), Node >=22.19, npm, Python 3, OpenTofu and SSH,
+plus Docker CLI access on each workload host. Build into a separate directory and
+run the checks:
 
 ```sh
 npm ci
@@ -103,31 +108,26 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 
 Build targets:
 
-- `make build`: CLI and provider for the current platform in `.local/bin/`.
+- `make build`: CLI and provider for the current platform in `.local/bin/`. This
+  replaces the binaries workload launchers use, so run it only to install a
+  reviewed build.
 - `make build-wm` or `make build-provider`: build one binary.
 - `make build-mac`: Apple Silicon binaries in `.local/bin/darwin-arm64/`.
 - `make build BIN_DIR=/path/to/bin`: select another output directory.
 
-Plain `make build` replaces the binaries in `.local/bin/` that workload launchers
-use. Run it when intentionally installing a reviewed build.
-
-`GO`, `GOCACHE`, `CGO_ENABLED`, `GOOS`, and `GOARCH` can be overridden.
-The default build disables cgo. The macOS/Linux CLI uses Unix process and locking
-APIs; Windows is not a supported target.
+`GO`, `GOCACHE`, `CGO_ENABLED`, `GOOS` and `GOARCH` can be overridden; cgo is
+disabled by default. macOS and Linux are supported; Windows is not.
 
 ## Try the configuration example
 
-[examples/workloads](examples/workloads/README.md) includes a local Docker app,
-an SSH model workload, companion bindings and a development-provider launcher.
-Copy it to your own configuration directory and fill in the exact identities of
-containers you intend to adopt. The shipped identities are synthetic placeholders.
+[examples/workloads](examples/workloads/README.md) includes a local Docker app, an
+SSH model workload, companion bindings and a development-provider launcher. Copy
+it to your own configuration directory, outside this checkout, and replace the
+synthetic identities with the exact containers you intend to adopt. The provider
+is not published to a registry, and the runner needs this checkout and its Node
+dependencies at runtime.
 
-Keep workload configuration/state separate from this source checkout. The provider
-is not published to a registry; the example launcher configures a development
-override pointing at your build. The runner currently needs this checkout and its
-Node dependencies at runtime. It is not a standalone Go-only installation.
-
-From your configured workload root:
+From your workload root:
 
 ```sh
 ./wm
@@ -135,11 +135,8 @@ From your configured workload root:
 ./wm apply models/d3 -v
 ```
 
-Apply runs without an interactive confirmation. Review the saved plan first.
-Recovery runs during an apply, not as a continuous background service. Start/stop,
-scoped restart and bounded recovery are implemented; image/model replacement and
-container reconstruction are rejected or remain unimplemented. Destroy stops an
-adopted container and retains the container and its data.
+Apply does not ask for confirmation, so review the saved plan first. Destroy stops
+an adopted container and keeps the container and its data.
 
 ## Documentation
 
