@@ -1,0 +1,18 @@
+flowchart TD
+  T[OpenTofu on Mac mini] --> P[wm provider]
+  P --> A[Pi Durable agent loop: Sol 6.1]
+  A --> C[Codemode: choose and execute steps]
+  E[Engine profiles: vLLM, vLLM-SR, SGLang, oMLX] --> A
+  C --> B[Scoped tools and durable journal on mini]
+  B --> D[Drivers: Docker or Compose, systemd, launchd]
+  D --> R[SSH: fleet workloads and owned exporters]
+  D --> L[Local execution: mini deployments only]
+  R --> O[Observe actual state and collect errors]
+  L --> O
+  B --> Q[External Prometheus on Studio: SSH read only]
+  Q --> O
+  O --> V{Intent and acceptance checks satisfied?}
+  V -->|No: diagnose and correct within budget| A
+  V -->|Yes: independent final verification| P
+  A -->|Blocked, cancelled, or budget exhausted| F[Persist partial state and recovery evidence]
+  F --> P

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "web",
+  "host": "controller-example",
+  "local": {
+    "hostname": "controller.example.invalid",
+    "dockerHost": "unix:///var/run/docker.sock"
+  },
+  "container": "example-web",
+  "observedContainerId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "observedImageId": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

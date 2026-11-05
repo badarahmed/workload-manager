@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "name": "d3",
+  "host": "gpu-01",
+  "ssh": {
+    "hostname": "192.0.2.10",
+    "hostKeyAlias": "gpu-01",
+    "user": "operator"
+  },
+  "container": "example-model",
+  "observedContainerId": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "remoteStateDirectory": "/srv/wm/models/d3",
+  "endpoint": "http://127.0.0.1:8899",
+  "discoveryPath": "/v1/systemone/models",
+  "inferencePath": "/v1/systemone"
+}

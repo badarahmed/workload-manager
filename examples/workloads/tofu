@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+wm_root=${WM_ROOT:-"$root/../wm"}
+wm_root=$(CDPATH= cd -- "$wm_root" && pwd)
+mkdir -p "$root/.local"
+# The provider is not published yet; keep the local build path outside HCL.
+python3 - "$wm_root" "$root/.local/tofurc" <<'PYCONFIG'
+import json,sys
+from pathlib import Path
+provider=str(Path(sys.argv[1])/'.local/bin')
+Path(sys.argv[2]).write_text('provider_installation {\n  dev_overrides {\n    "registry.opentofu.org/homelab/wm" = '+json.dumps(provider)+'\n  }\n  direct {}\n}\n')
+PYCONFIG
+export TF_CLI_CONFIG_FILE="$root/.local/tofurc"
+export TF_VAR_wm_root="$wm_root"
+exec python3 "$wm_root/scripts/tofu_verbose.py" "$root" "$@"

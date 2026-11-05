@@ -1,0 +1,22 @@
+version: 1
+# Switch to sol to use the controller's Codex sign-in.
+active: glm
+
+profiles:
+  glm:
+    backend: openai-compatible
+    model: GLM-5.3-Flash-EXL3
+    baseUrl: http://127.0.0.1:8888/v1
+    contextWindow: 1000000
+    maxOutputTokens: 4096
+    reasoning: true
+    compat:
+      thinkingFormat: chat-template
+      chatTemplateKwargs:
+        enable_thinking: false
+      requiresReasoningContentOnAssistantMessages: true
+
+  sol:
+    backend: codex
+    model: gpt-6.1-sol
+    thinkingLevel: medium

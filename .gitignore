@@ -1,0 +1,33 @@
+# Dependencies and local artifacts (including private docs in .local/docs/)
+node_modules/
+.local/
+
+# OpenTofu runtime artifacts
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Local configuration
+.env
+.env.*
+!.env.example
+*.tfvars
+*.tfvars.json
+/agent.yaml
+/agent.json
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# macOS artifacts
+.DS_Store

@@ -1,0 +1,25 @@
+{
+  "name": "fixture-model",
+  "host": "gpu-01",
+  "ssh": {
+    "hostname": "192.0.2.10",
+    "hostKeyAlias": "gpu-01",
+    "user": "operator"
+  },
+  "driver": "docker",
+  "engine": "vllm-sr",
+  "mode": "engine",
+  "recovery": {
+    "allowRestart": true,
+    "startupGraceSeconds": 600
+  },
+  "model": "example-org/example-model",
+  "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "container": "fixture-model",
+  "observedContainerId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "imageDigestFromHostDocumentation": "example/engine@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "remoteStateDirectory": "/srv/wm/models/fixture-model",
+  "endpoint": "http://127.0.0.1:8899",
+  "discoveryPath": "/v1/systemone/models",
+  "inferencePath": "/v1/systemone"
+}
