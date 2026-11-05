@@ -2,6 +2,7 @@
 
 ## Implementation and use
 
+- [Reconciliation design](reconciliation.md): declarative intent, agentic reconciliation, tradeoffs and alternatives.
 - [Operator CLI](wm-operator.md): status, plan/apply, lifecycle and STATE SYNC.
 - [Status details](status-cli.md): application/engine versions and model pins.
 - [Configuration](workloads-dx.md): HCL, companion bindings and ownership.

@@ -16,6 +16,23 @@
 | `scripts/tofu_verbose.py` | Scope mapping, profile discovery and progress transport |
 | `agent/testdata` | Synthetic test fixtures; no live host dependencies |
 
+## Build targets
+
+- `make build`: CLI and provider for the current platform in `.local/bin/`. This
+  replaces the binaries workload launchers use, so run it only to install a
+  reviewed build.
+- `make build-wm` or `make build-provider`: build one binary.
+- `make build-mac`: Apple Silicon binaries in `.local/bin/darwin-arm64/`.
+- `make build BIN_DIR=/path/to/bin`: select another output directory. Check the
+  result with `/path/to/bin/wm --version`.
+
+`GO`, `GOCACHE`, `CGO_ENABLED`, `GOOS` and `GOARCH` can be overridden; cgo is
+disabled by default. The CLI uses Unix process and locking APIs, so Windows is not
+a supported target. The provider is not published to a registry, and the runner
+needs this checkout and its Node dependencies at runtime.
+
+## Tests
+
 See [build and checks](../README.md#build-and-verify). Tests use fake transports,
 temporary directories and simulated services. They cover failed apply/state retention,
 saved-plan checks, identity drift, lost replies, durable replay, cancellation and probes.
