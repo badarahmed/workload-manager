@@ -39,7 +39,7 @@ export function parseModelConfig(text:string,profile?:string):ModelConfig {
  return validateConfig(value); // Backwards-compatible single-model JSON/YAML.
 }
 function validateConfig(value:unknown):ModelConfig {
- if(!Value.Check(schema,value)) throw new Error('Invalid agent config; see docs/agent-model.md for supported fields (credentials must use apiKeyEnv)');
+ if(!Value.Check(schema,value)) throw new Error('Invalid agent config; see docs/configuration.md for supported fields (credentials must use apiKeyEnv)');
  const config=value as ModelConfig;
  if(config.backend==='openai-compatible') {
   const url=new URL(config.baseUrl);

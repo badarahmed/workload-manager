@@ -4,15 +4,15 @@
 
 - This repository implements the Go provider, operator CLI and TypeScript Pi Durable
   runner. Live HCL/state belong in a separate workload configuration directory.
-- Read [README.md](README.md), [configuration](docs/workloads-dx.md) and
-  [development notes](docs/development.md) for context.
+- Read [README.md](README.md), [design](docs/design.md), [configuration](docs/configuration.md)
+  and [development notes](docs/development.md) for context.
 - If `.local/docs/README.md` exists, read it before working on this checkout's
   live deployment. Private operating records belong in ignored `.local/docs/`.
 - Public examples and test fixtures use synthetic identities. Never adopt the same
   real container into a second state root or test against it by accident.
 - Specs describe a broader target than the implementation. Distinguish proposed,
   implemented and verified behavior. Keep public detailed docs in `docs/`.
-- Version CLI/provider/agent releases together; follow [versioning](docs/versioning.md)
+- Version CLI/provider/agent releases together; follow [versioning](docs/development.md#versioning-and-releases)
   and keep Go/package metadata and the changelog consistent.
 
 ## Implementation boundaries

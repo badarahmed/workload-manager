@@ -77,5 +77,5 @@ This directory does not contain state, credentials or deployment captures. Keep
 the copied root private and back up its state. `.local/`, `.terraform/`, plans,
 state/backups, agent configuration and variable files are ignored by its gitignore.
 
-See the source checkout's `docs/wm-operator.md`, `docs/workloads-dx.md` and
-`docs/agent-model.md` for the full behavior and current limits.
+See the source checkout's [configuration](../../docs/configuration.md) and
+[operations](../../docs/operations.md) docs for the full behavior and current limits.

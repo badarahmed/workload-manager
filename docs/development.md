@@ -1,4 +1,7 @@
-# Development and implementation boundaries
+# Development
+
+See [design](design.md) for the safeguards every change must preserve and
+[AGENTS.md](../AGENTS.md) for contributor rules.
 
 ## Code layout
 
@@ -16,90 +19,90 @@
 | `scripts/tofu_verbose.py` | Scope mapping, profile discovery and progress transport |
 | `agent/testdata` | Synthetic test fixtures; no live host dependencies |
 
-## Build targets
+Docker CLI calls and the Python remote helper are the production execution path.
+A Go executor is only a [proposal](proposals/implementation-proposals.md).
+
+## Build
+
+```sh
+npm ci
+make build BIN_DIR=.local/release-check
+.local/release-check/wm --version
+```
 
 - `make build`: CLI and provider for the current platform in `.local/bin/`. This
   replaces the binaries workload launchers use, so run it only to install a
   reviewed build.
 - `make build-wm` or `make build-provider`: build one binary.
 - `make build-mac`: Apple Silicon binaries in `.local/bin/darwin-arm64/`.
-- `make build BIN_DIR=/path/to/bin`: select another output directory. Check the
-  result with `/path/to/bin/wm --version`.
+- `make build BIN_DIR=/path/to/bin`: select another output directory.
 
 `GO`, `GOCACHE`, `CGO_ENABLED`, `GOOS` and `GOARCH` can be overridden; cgo is
 disabled by default. The CLI uses Unix process and locking APIs, so Windows is not
-a supported target. The provider is not published to a registry, and the runner
-needs this checkout and its Node dependencies at runtime.
+supported. The provider is not published to a registry, and the runner needs this
+checkout and its Node dependencies at runtime.
 
 ## Tests
 
-See [build and checks](../README.md#build-and-verify). Tests use fake transports,
-temporary directories and simulated services. They cover failed apply/state retention,
-saved-plan checks, identity drift, lost replies, durable replay, cancellation and probes.
-They do not establish that all failure scenarios have been exercised on real hosts.
+```sh
+npm run typecheck
+npm test
+make test-go
+python3 -m unittest discover -s agent/remote -p 'test_*.py'
+python3 -m unittest discover -s scripts -p 'test_*.py'
+```
 
-## Authentication
+Tests use fake transports, temporary directories, simulated services and an
+isolated fake OpenTofu backend. They cover failed apply and state retention,
+saved-plan checks and fingerprints, identity drift, remote drift and unknown
+comparisons, lost replies, durable replay, cancellation, probes, scope mapping,
+interrupts, and lifecycle ordering, failure handling and plan-boundary guards.
+They do not show that every failure scenario has been exercised on real hosts. The
+model [smoke test](configuration.md#smoke-test) checks a real LLM against
+simulated tools. Never stop or restart a live workload just to test a change.
 
-See [agent configuration](agent-model.md). The Codex bridge reads access tokens from
-`$CODEX_HOME/auth.json` (default `~/.codex/auth.json`) on demand. Codex owns refresh;
-wm requires 35 minutes of remaining validity and does not support keychain-only auth.
-Never copy credentials into source, HCL, bindings, journals or workload hosts.
-Explicit Pi session cleanup closes cached connections when a runner completes.
+## Launcher and progress
 
-Without a model config, `WM_MODEL_AUTH=codex|api|auto` selects the legacy backend.
-`api` requires `OPENAI_API_KEY`; `auto` prefers that key, then Codex sign-in.
-Compatible endpoint profiles only receive their explicitly configured credentials.
+The example `tofu` launcher sets development provider overrides and
+`TF_VAR_wm_root`, then calls `scripts/tofu_verbose.py`. That script discovers
+`agent.yaml`, resolves `--scope` from registered module paths and forwards signals.
 
-## Recovery and durability
+Verbose apply uses a private `WM_PROGRESS_FILE`. Allowlisted action, probe and wait
+summaries stream to stderr; raw model reasoning, generated code and logs are not
+forwarded. OpenTofu output, exit status and interrupts are unchanged. With
+`WM_HIDE_DEV_WARNING=1` only the development-override banner is filtered. JSON is
+never filtered. Progress has no authority over readiness, receipts or
+cancellation.
 
-The loop observes actual state, chooses scoped steps, diagnoses failures and independently
-verifies readiness. It runs within apply, not as a background daemon. Existing Docker
-supervision and monitoring remain independent. Destroy stops an adopted container and
-retains it and its data; reconstruction and image/model replacement remain unimplemented.
+## Runtime paths
 
-Admission checkpoints preserve request IDs, a 30-minute deadline, an 80-command budget
-and a 40-model-request budget across retries. Output is capped at 4096 tokens per model
-request; this is not a total input-token or monetary budget. Budget exhaustion terminates
-outside the tool loop. SSH/waits accept cancellation; interrupted remote outcomes can
-still be unknown. Observe exact identity and receipts before retrying.
+Applied recipes, operation IDs and journal paths depend on stable checkout
+locations. Keep `.local/recipes/` and `.local/operations/` in place during cleanup;
+controller binaries live in `.local/bin/`. Saved plans, intent backups and state
+live under the workload root. Private deployment notes belong in ignored
+`.local/docs/`. None of these are committed.
 
-A kernel lock under `~/.local/state/wm/locks`, keyed by host alias, driver and container
-ID, excludes conflicting operations for one controller OS user. Remote helpers serialize
-mutations and store versioned receipts. This is not cross-controller fencing.
+## Versioning and releases
 
-Applied recipes, operation IDs and journal paths depend on stable checkout locations.
-Keep `.local/recipes/` and `.local/operations/` in place during repository cleanup.
-Controller binaries live in `.local/bin/`. Plans/backups remain under the workload root.
-Private deployment notes belong in ignored `.local/docs/`, separate from public docs.
+wm uses Semantic Versioning, starting at **0.1.0** (unreleased). The CLI, provider
+and agent ship together from one source tree. Git tags use `v0.1.0`; package
+metadata uses `0.1.0`. Before 1.0, patch releases are compatible fixes and minor
+releases may break compatibility. Record HCL, state, journal, binding or CLI
+compatibility changes in the [changelog](../CHANGELOG.md). A version bump is not a
+state or journal migration.
 
-## Deterministic safeguards
+To change the version, update together:
 
-Ownership checks remain available even when model/image drift makes the workload
-unready; authorized stop and diagnostics must not be blocked by unrelated readiness
-failure. Start/restart require the declared model/image checks. Compare desired manifest
-references against RepoDigests, not Docker configuration image IDs.
+1. The Go constant in `internal/version/version.go`.
+2. `version` in `package.json` and `package-lock.json` (including the lockfile
+   root package).
+3. `CHANGELOG.md`, with compatibility notes and the release date.
 
-Tool results are runtime-validated, bounded and sanitized. Exit status alone cannot
-establish success. Model/tool output is untrusted evidence, never new authority. HTTP
-probes disable redirects and proxies and bound response size/time. Application health
-is distinct from full business functionality. Metrics retain freshness and coverage;
-missing telemetry is not zero and never grants rights to mutate an external service.
+`make test-go` checks that Go and package metadata agree. Builds embed the version
+without linker flags or a Git checkout; `wm --version` prints it without
+inspecting workloads, and the provider reports it in protocol metadata.
 
-Prometheus is an external prerequisite, not provisioned by wm. Exporter ownership
-is scoped independently from the observed application and shared monitoring networks.
-The [Go executor](go-docker-executor-proposal.md) remains a proposal; Docker CLI and
-Python remain the production execution path.
-
-## Progress and launcher behavior
-
-The example launcher sets development provider overrides and `TF_VAR_wm_root`, then
-calls `scripts/tofu_verbose.py`. It discovers `agent.yaml` (legacy `agent.json`
-fallback), resolves `--scope` from registered module paths and forwards signals.
-The operator uses a workload-root `tofu` launcher rather than a globally installed binary.
-
-Verbose apply uses a private `WM_PROGRESS_FILE`. Allowlisted action/probe/wait summaries
-stream to stderr; raw model reasoning, generated code and logs are not forwarded.
-The underlying OpenTofu output, exit status and interrupts remain intact. With
-`WM_HIDE_DEV_WARNING=1`, only the recognized development-override banner is filtered;
-other diagnostics remain. JSON is not filtered. Progress has no authority over readiness,
-receipts or cancellation.
+To release, build and test in an alternate `BIN_DIR`, run the Python tests for
+executor or launcher changes, review the public file set and changelog, then commit
+before tagging. Never include `.local/`, state, credentials or deployment captures
+in release assets. Setting the version does not tag, publish or install anything.

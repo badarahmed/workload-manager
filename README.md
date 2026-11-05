@@ -1,7 +1,8 @@
 # Workload Manager
 
-Version **0.1.0** (unreleased prototype). See [versioning](docs/versioning.md) and
-the [changelog](CHANGELOG.md).
+Version **0.1.0** (unreleased prototype). See
+[versioning](docs/development.md#versioning-and-releases) and the
+[changelog](CHANGELOG.md).
 
 wm manages Docker workloads across hosts from one declarative configuration. You
 state what each workload should be: running or stopped, which image or model it
@@ -49,7 +50,7 @@ flowchart LR
 ```
 
 Solid lines are implemented; dashed lines are planned. See
-[declarative intent, agentic reconciliation](docs/reconciliation.md) for the
+[declarative intent, agentic reconciliation](docs/design.md) for the
 design, safeguards, tradeoffs and alternatives considered.
 
 ## Build and verify
@@ -67,7 +68,7 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 
 Plain `make build` installs into `.local/bin/`, replacing the binaries workload
 launchers use; `make build-mac` targets Apple Silicon. macOS and Linux are
-supported; Windows is not. See [build targets](docs/development.md#build-targets).
+supported; Windows is not. See [build targets](docs/development.md#build).
 
 ## Try the example
 
@@ -86,10 +87,9 @@ an adopted container and keeps the container and its data.
 
 ## Documentation
 
-- [Documentation index](docs/README.md)
-- [Reconciliation design](docs/reconciliation.md): approach, tradeoffs and alternatives
-- [Operator CLI](docs/wm-operator.md): status, lifecycle, saved plans and STATE SYNC
-- [Workload configuration](docs/workloads-dx.md): HCL and companion bindings
-- [Agent configuration](docs/agent-model.md): YAML profiles and authentication
-- [Development](docs/development.md): implementation boundaries and validation
+- [Design](docs/design.md): reconciliation approach, safeguards, tradeoffs and alternatives
+- [Configuration](docs/configuration.md): HCL, companion bindings and agent model profiles
+- [Operations](docs/operations.md): status, STATE SYNC, plan/apply and lifecycle commands
+- [Development](docs/development.md): code layout, build, tests and versioning
+- [Proposals](docs/proposals/target-design.md): target design beyond the prototype
 - [Contributor instructions](AGENTS.md)
