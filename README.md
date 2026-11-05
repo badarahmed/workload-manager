@@ -26,6 +26,37 @@ wm gives each workload one declared intent, one place to see its status and one
 reviewed path for changing it, without replacing the Docker setups that already
 work.
 
+## Hosts and runtimes
+
+wm runs on one controller machine. Every operation goes through the same broker
+and a runtime driver, reached either locally or over SSH. Docker is implemented
+for apps on the controller's own daemon and for model servers on remote Linux GPU
+hosts. Docker apps on other remote hosts and native services managed by launchd
+on macOS or systemd on Linux are planned. Bare background shells are deliberately
+not a runtime: every workload stays under a real supervisor.
+
+```mermaid
+flowchart LR
+  subgraph CTL["Controller (Mac or Linux)"]
+    CLI["wm CLI + OpenTofu"] --> PR["wm provider"]
+    PR --> AG["Agent loop"]
+    AG --> BR["Broker<br/>identity, policy, budgets"]
+  end
+
+  BR -->|local| LD["Docker daemon<br/>local apps"]
+  BR -->|SSH| GPU["Linux GPU host<br/>Docker: model servers"]
+  BR -.->|SSH| LX["Linux host<br/>Docker: apps"]
+  BR -.->|local or SSH| LA["macOS host<br/>launchd services"]
+  BR -.->|local or SSH| SD["Linux host<br/>systemd services"]
+
+  classDef planned stroke-dasharray: 5 5,opacity:0.7
+  class LX,LA,SD planned
+```
+
+Solid lines are implemented; dashed lines are planned. Each workload is adopted
+as one exact runtime identity (container ID, and later unit or service label) on
+one host. Coordinating several hosts as a single deployment remains design work.
+
 ## Declarative intent, agentic reconciliation
 
 Infrastructure-as-code tools are good at declaring *what* you want and showing a
