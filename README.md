@@ -156,7 +156,3 @@ an adopted container and keeps the container and its data.
 - [Agent configuration](docs/agent-model.md): YAML profiles and authentication
 - [Development](docs/development.md): implementation boundaries and validation
 - [Contributor instructions](AGENTS.md)
-
-## License
-
-[MIT](LICENSE). Dependencies retain their own licenses.
